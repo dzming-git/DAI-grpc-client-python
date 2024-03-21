@@ -93,24 +93,28 @@ class ImageHarmonyClient:
         Returns:
             A tuple of (int, bytes), where the int is the image ID, and the bytes are the image buffer.
         """
-        request = image_harmony_pb2.GetImageByImageIdRequest(
-            connectionId=self.__connection_id,
-            imageRequest=image_harmony_pb2.CustomImageRequest(
-                imageId=image_id,
-                noImageBuffer=False,
-                format=format,
-                params=params,
-                expectedW=width,
-                expectedH=height
+        try:
+            request = image_harmony_pb2.GetImageByImageIdRequest(
+                connectionId=self.__connection_id,
+                imageRequest=image_harmony_pb2.CustomImageRequest(
+                    imageId=image_id,
+                    noImageBuffer=False,
+                    format=format,
+                    params=params,
+                    expectedW=width,
+                    expectedH=height
+                )
             )
-        )
-        response = self.__client.getImageByImageId(request)
-        if response.response.code != 200:
+            response = self.__client.getImageByImageId(request)
+            if response.response.code != 200:
+                logging.warning(f'Failed to retrieve image buffer: {response.response.message}')
+                return 0, b''
+            image_id = response.imageResponse.imageId
+            buffer = response.imageResponse.buffer
+            return image_id, buffer
+        except Exception as e:
+            logging.error(f'Error in get_image_buffer_by_image_id: {str(e)}')
             return 0, b''
-        
-        image_id = response.imageResponse.imageId
-        buffer = response.imageResponse.buffer
-        return image_id, buffer
 
     def get_image_by_image_id(
         self, 
