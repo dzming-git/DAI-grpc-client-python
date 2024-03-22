@@ -25,52 +25,68 @@ class ImageHarmonyClient:
             ip (str): The IP address of the Image Harmony service.
             port (str): The port number of the Image Harmony service.
         """
+        self.__ip: str = ip
+        self.__port: str = port
         options = [('grpc.max_receive_message_length', 1024 * 1024 * 1024)]
         self.__conn = grpc.insecure_channel(f'{ip}:{port}', options=options)
         self.__client = image_harmony_pb2_grpc.CommunicateStub(channel=self.__conn)
         self.__connection_id = 0
         logging.info("Image Harmony client initialized")
 
-    def connect_image_loader(self, loader_args_hash: int) -> Tuple[bool, str]:
+    def connect_image_loader(self, loader_args_hash: int) -> None:
         """
         Connects to the image loader using the provided loader arguments hash.
 
         Parameters:
             loader_args_hash (int): The hash value of the loader arguments.
-
-        Returns:
-            A tuple of (bool, str), where the bool indicates success (True) or failure (False),
-            and the str provides a relevant message.
         """
         try:
             request = image_harmony_pb2.ConnectImageLoaderRequest(loaderArgsHash=loader_args_hash)
             response = self.__client.connectImageLoader(request)
+            # Check the response code to determine if the operation was successful
+            if response.response.code != 200:
+                raise(Exception('\n'.join(
+                    [
+                        'Failed to connect image loader',
+                       f'Loader args hash: {loader_args_hash}',
+                        'Image Hramony gRPC Info:',
+                       f'   ip:   {self.__ip}',
+                       f'   port: {self.__port}',
+                        'Error:',
+                        response.response.message
+                    ]
+                )))
             self.__connection_id = response.connectionId
             logging.info(f'Connected to image loader: {response.response.message}')
-            return True, response.response.message
         except grpc.RpcError as e:
-            logging.error(f'Failed to connect image loader: {e}')
-            return False, f'gRPC error: {str(e)}'
+            raise(f'gRPC error in connect_image_loader: \n{e}') from e
 
-    def disconnect_image_loader(self) -> Tuple[bool, str]:
+    def disconnect_image_loader(self) -> None:
         """
         Disconnects the current connection to the image loader.
-
-        Returns:
-            A tuple of (bool, str), where the bool indicates success (True) or failure (False),
-            and the str provides a relevant message.
         """
-        if self.__connection_id:
-            try:
-                request = image_harmony_pb2.DisconnectImageLoaderRequest(connectionId=self.__connection_id)
-                response = self.__client.disconnectImageLoader(request)
-                self.__connection_id = 0
-                logging.info(f'Disconnected from image loader: {response.response.message}')
-                return True, 'Disconnected from image loader'
-            except grpc.RpcError as e:
-                logging.error(f'Failed to disconnect image loader: {e}')
-                return False, f'gRPC error: {str(e)}'
-        return True, 'Not connected to image loader'
+        if 0 == self.__connection_id:
+            return
+        try:
+            request = image_harmony_pb2.DisconnectImageLoaderRequest(connectionId=self.__connection_id)
+            response = self.__client.disconnectImageLoader(request)
+            # Check the response code to determine if the operation was successful
+            if response.response.code != 200:
+                raise(Exception('\n'.join(
+                    [
+                        'Failed to disconnect image loader',
+                        'Image Hramony gRPC Info:',
+                       f'   ip:   {self.__ip}',
+                       f'   port: {self.__port}',
+                        'Error:',
+                        response.response.message
+                    ]
+                )))
+            self.__connection_id = 0
+            logging.info(f'Disconnected from image loader: {response.response.message}')
+            return True, 'Disconnected from image loader'
+        except grpc.RpcError as e:
+            raise(f'gRPC error in disconnect_image_loader: \n{e}') from e
 
     def get_image_buffer_by_image_id(
         self, 
@@ -106,15 +122,23 @@ class ImageHarmonyClient:
                 )
             )
             response = self.__client.getImageByImageId(request)
+            # Check the response code to determine if the operation was successful
             if response.response.code != 200:
-                logging.warning(f'Failed to retrieve image buffer: {response.response.message}')
-                return 0, b''
+                raise(Exception('\n'.join(
+                    [
+                        'Failed to retrieve image buffer',
+                        'Image Hramony gRPC Info:',
+                       f'   ip:   {self.__ip}',
+                       f'   port: {self.__port}',
+                        'Error:',
+                        response.response.message
+                    ]
+                )))
             image_id = response.imageResponse.imageId
             buffer = response.imageResponse.buffer
             return image_id, buffer
-        except Exception as e:
-            logging.error(f'Error in get_image_buffer_by_image_id: {str(e)}')
-            return 0, b''
+        except grpc.RpcError as e:
+            raise(f'gRPC error in get_image_buffer_by_image_id: \n{e}') from e
 
     def get_image_by_image_id(
         self, 
@@ -135,21 +159,21 @@ class ImageHarmonyClient:
         Returns:
             A tuple of (int, np.ndarray), where the int is the image ID, and the np.ndarray is the decoded OpenCV image.
         """
-        try:
-            image_id, buffer = self.get_image_buffer_by_image_id(image_id, width, height, format, params)
-            if not buffer:
-                logging.warning(f'No buffer received for image ID: {image_id}')
-                return 0, np.array([])
-            nparr = np.frombuffer(buffer, np.uint8)
-            image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-            if image is None:
-                logging.error(f'Failed to decode image for image ID: {image_id}')
-                return image_id, np.array([])
-            logging.info(f'Successfully decoded image for image ID: {image_id}')
-            return image_id, image
-        except Exception as e:
-            logging.error(f'Error in get_image_by_image_id: {str(e)}')
-            return 0, np.array([])
+        image_id, buffer = self.get_image_buffer_by_image_id(image_id, width, height, format, params)
+        nparr = np.frombuffer(buffer, np.uint8)
+        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        if image is None:
+            raise(Exception('\n'.join(
+                [
+                    f'Failed to decode image for image ID: {image_id}',
+                    'Image Hramony gRPC Info:',
+                    f'   ip:   {self.__ip}',
+                    f'   port: {self.__port}',
+                ]
+            )))
+        logging.info(f'Successfully decoded image for image ID: {image_id}')
+        return image_id, image
+
 
     def get_image_size_by_image_id(self, image_id: int) -> Tuple[int, int]:
         """
@@ -171,12 +195,19 @@ class ImageHarmonyClient:
             )
             response = self.__client.getImageByImageId(request)
             if response.response.code != 200:
-                logging.warning(f'Failed to retrieve image size: {response.response.message}')
-                return 0, 0
+                raise(Exception('\n'.join(
+                    [
+                        'Failed to retrieve image size',
+                        'Image Hramony gRPC Info:',
+                        f'   ip:   {self.__ip}',
+                        f'   port: {self.__port}',
+                        'Error:',
+                        response.response.message
+                    ]
+                )))
             width = response.imageResponse.width
             height = response.imageResponse.height
             logging.info(f'Successfully retrieved image size: {width}x{height} for image ID: {image_id}')
             return width, height
-        except Exception as e:
-            logging.error(f'Error in get_image_size_by_image_id: {str(e)}')
-            return 0, 0
+        except grpc.RpcError as e:
+            raise(f'gRPC error in get_image_size_by_image_id: \n{e}') from e
