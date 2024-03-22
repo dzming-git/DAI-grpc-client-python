@@ -113,6 +113,50 @@ class TargetDetectionClient:
         self.__result_mapping_table: Dict[int, str] = self.get_result_mapping_table()
         self.filter = self.Filter(len(self.__result_mapping_table))
         
+    def convert_id_to_label(self, label_id: int) -> str:
+        """
+        Converts a label ID to its corresponding string label.
+
+        Parameters:
+            label_id (int): The ID of the label to convert.
+
+        Returns:
+            str: The string representation of the label.
+        
+        Raises:
+            Exception: If the label ID does not exist in the result mapping table.
+        """
+        try:
+            label = self.__result_mapping_table[label_id]
+            logging.info(f"Converted label ID {label_id} to label '{label}'.")
+            return label
+        except KeyError:
+            error_msg = f"TargetDetectionClient Error: Failed to find label for ID {label_id}"
+            logging.error(error_msg)
+            raise Exception(error_msg)
+
+    def query_label_id(self, label: str) -> int:
+        """
+        Queries the ID of a given label.
+
+        Parameters:
+            label (str): The label whose ID is queried.
+
+        Returns:
+            int: The ID of the label.
+        
+        Raises:
+            Exception: If the label does not exist in the result mapping table.
+        """
+        logging.info(f"Querying ID for label '{label}'.")
+        for k, v in self.__result_mapping_table.items():
+            if v == label:
+                logging.info(f"Found ID {k} for label '{label}'.")
+                return k
+        error_msg = f"TargetDetectionClient Error: Failed to find ID for label '{label}'"
+        logging.error(error_msg)
+        raise Exception(error_msg)
+
     def get_result_mapping_table(self) -> Dict[int, str]:
         """
         Fetches the result mapping table from the server, mapping label IDs to their string representations.
