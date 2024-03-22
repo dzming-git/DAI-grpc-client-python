@@ -1,7 +1,7 @@
 from generated.protos.service_coordinator import service_coordinator_pb2, service_coordinator_pb2_grpc
 import grpc
 import logging
-from typing import Dict, Tuple
+from typing import Dict
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
