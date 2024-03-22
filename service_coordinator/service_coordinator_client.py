@@ -11,7 +11,7 @@ class ServiceCoordinatorClient:
     A client to communicate with the Service Coordinator service over gRPC.
     """
 
-    def __init__(self, ip: str, port: int):
+    def __init__(self, name: str, ip: str, port: int):
         """
         Initializes the client with the service IP address and port.
 
@@ -19,11 +19,14 @@ class ServiceCoordinatorClient:
             ip (str): IP address of the Service Coordinator service.
             port (int): Port number of the Service Coordinator service.
         """
+        self.__name: str = name
+        self.__ip: str = ip
+        self.__port: str = port
         self.__conn = grpc.insecure_channel(f'{ip}:{port}')
         self.__client = service_coordinator_pb2_grpc.CommunicateStub(channel=self.__conn)
         logging.info("Service Coordinator client initialized.")
 
-    def inform_previous_service_info(self, task_id: str, pre_service_name: str, pre_service_ip: str, pre_service_port: str, args: Dict[str, str] = {}) -> bool:
+    def inform_previous_service_info(self, task_id: str, pre_service_name: str, pre_service_ip: str, pre_service_port: str, args: Dict[str, str] = {}) -> None:
         """
         Informs the Service Coordinator about the information of the previous service.
 
@@ -51,15 +54,27 @@ class ServiceCoordinatorClient:
                     arg.value = value
             response = self.__client.informPreviousServiceInfo(request)
             if response.response.code != 200:
-                logging.error(f'Failed to inform previous service info: {response.response.message}, Task ID: {task_id}')
-                return False
+                raise(Exception('\n'.join(
+                    [
+                        'Failed to inform previous service info',
+                       f'Task ID: {task_id}',
+                        'Previous Service Info:',
+                       f'   name: {pre_service_name}',
+                       f'   ip:   {pre_service_ip}',
+                       f'   port: {pre_service_port}',
+                        'Current Service Info:',
+                       f'   name: {self.__name}',
+                       f'   ip:   {self.__ip}',
+                       f'   port: {self.__port}',
+                        'Error:',
+                        response.response.message
+                    ]
+                )))
             logging.info(f'Successfully informed previous service info, Task ID: {task_id}')
-            return True
         except grpc.RpcError as e:
-            logging.error(f'gRPC error in inform_previous_service_info: {e}, Task ID: {task_id}')
-            return False
+            raise(f'gRPC error in inform_previous_service_info: \n{e}') from e
 
-    def inform_current_service_info(self, task_id: str, args: Dict[str, str] = {}) -> Tuple[bool, Dict[str, str]]:
+    def inform_current_service_info(self, task_id: str, args: Dict[str, str] = {}) -> Dict[str, str]:
         """
         Informs the Service Coordinator about the configuration and state of the current service.
         This method also returns any output arguments provided by the Service Coordinator, 
@@ -89,8 +104,18 @@ class ServiceCoordinatorClient:
             
             # Check the response code to determine if the operation was successful
             if response.response.code != 200:
-                logging.error(f'Failed to inform current service info: {response.response.message}, Task ID: {task_id}')
-                return False, {}
+                raise(Exception('\n'.join(
+                    [
+                        'Failed to inform current service info',
+                       f'Task ID: {task_id}',
+                        'Current Service Info:',
+                       f'   name: {self.__name}',
+                       f'   ip:   {self.__ip}',
+                       f'   port: {self.__port}',
+                        'Error:',
+                        response.response.message
+                    ]
+                )))
             
             # Extract output arguments from the response
             args_output: Dict[str, str] = {}
@@ -98,51 +123,60 @@ class ServiceCoordinatorClient:
                 args_output[arg.key] = arg.value
             
             logging.info(f'Successfully informed current service info, Task ID: {task_id}')
-            return True, args_output
+            return args_output
         except grpc.RpcError as e:
-            logging.error(f'gRPC error in inform_current_service_info: {e}, Task ID: {task_id}')
-            return False, {}
+            raise(f'gRPC error in inform_current_service_info: \n{e}') from e
         
-    def start(self, task_id: str) -> bool:
+    def start(self, task_id: str) -> None:
         """
         Requests the Service Coordinator to start a service or task based on the given task ID.
 
         Parameters:
             task_id (str): The unique identifier of the task to start.
-
-        Returns:
-            bool: True if the request to start the service or task was successful, False otherwise.
         """
         try:
             request = service_coordinator_pb2.StartRequest(taskId=task_id)
             response = self.__client.start(request)
             if response.response.code != 200:
-                logging.error(f'Failed to start task: {response.response.message}, Task ID: {task_id}')
-                return False
+                raise(Exception('\n'.join(
+                    [
+                        'Failed to start the service',
+                       f'Task ID: {task_id}',
+                        'Current Service Info:',
+                       f'   name: {self.__name}',
+                       f'   ip:   {self.__ip}',
+                       f'   port: {self.__port}',
+                        'Error:',
+                        response.response.message
+                    ]
+                )))
             logging.info(f'Successfully started task, Task ID: {task_id}')
-            return True
-        except Exception as e:
-            logging.error(f'Error in starting task: {str(e)}, Task ID: {task_id}')
-            return False
+        except grpc.RpcError as e:
+            raise(f'gRPC error in start: \n{e}') from e
 
-    def stop(self, task_id: str) -> bool:
+    def stop(self, task_id: str) -> None:
         """
         Requests the Service Coordinator to stop a service or task based on the given task ID.
 
         Parameters:
             task_id (str): The unique identifier of the task to stop.
-
-        Returns:
-            bool: True if the request to stop the service or task was successful, False otherwise.
         """
         try:
             request = service_coordinator_pb2.StopRequest(taskId=task_id)
             response = self.__client.stop(request)
             if response.response.code != 200:
-                logging.error(f'Failed to stop task: {response.response.message}, Task ID: {task_id}')
-                return False
+                raise(Exception('\n'.join(
+                    [
+                        'Failed to stop the service',
+                       f'Task ID: {task_id}',
+                        'Current Service Info:',
+                       f'   name: {self.__name}',
+                       f'   ip:   {self.__ip}',
+                       f'   port: {self.__port}',
+                        'Error:',
+                        response.response.message
+                    ]
+                )))
             logging.info(f'Successfully stopped task, Task ID: {task_id}')
-            return True
-        except Exception as e:
-            logging.error(f'Error in stopping task: {str(e)}, Task ID: {task_id}')
-            return False
+        except grpc.RpcError as e:
+            raise(f'gRPC error in stop: \n{e}') from e
